@@ -6,10 +6,8 @@
 
 namespace Garden\SafeCurl\Exception;
 
-use Garden\SafeCurl\Exception;
-
 /**
- * Errors originating from URL validation.
+ * An exception representing a cURL error.
  */
-class InvalidURLException extends Exception {
+class CurlException extends \Exception {
 }

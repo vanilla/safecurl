@@ -1,155 +1,195 @@
 <?php
+/**
+ * @copyright 2009-2019 Vanilla Forums Inc.
+ * @license MIT
+ */
 
-use fin1te\SafeCurl\Options;
-use fin1te\SafeCurl\SafeCurl;
+namespace Garden\SafeCurl\Tests;
 
-class SafeCurlTest extends \PHPUnit_Framework_TestCase
-{
-    public function testFunctionnalGET()
-    {
+use Garden\SafeCurl\SafeCurl;
+use Garden\SafeCurl\Exception\InvalidURLException;
+use Garden\SafeCurl\UrlPartsList;
+use Garden\SafeCurl\UrlValidator;
+
+/**
+ * Verify functionality of the SafeCurl class.
+ */
+class SafeCurlTest extends \PHPUnit\Framework\TestCase {
+
+    /**
+     * Verify the ability to retrieve a normal URL using the default configuration.
+     */
+    public function testFunctionnalGet() {
         $handle = curl_init();
 
         $safeCurl = new SafeCurl($handle);
-        $response = $safeCurl->execute('http://www.google.com');
+        $response = $safeCurl->execute("http://www.example.com");
 
         $this->assertNotEmpty($response);
-        $this->assertEquals($handle, $safeCurl->getCurlHandle());
-        $this->assertNotContains('HTTP/1.1 302 Found', $response);
-    }
-
-    public function testFunctionnalHEAD()
-    {
-        $handle = curl_init();
-        // for an unknown reason, HEAD request failed: https://travis-ci.org/j0k3r/safecurl/jobs/91936743
-        // curl_setopt($handle, CURLOPT_CUSTOMREQUEST, 'HEAD');
-        curl_setopt($handle, CURLOPT_NOBODY, true);
-
-        $safeCurl = new SafeCurl($handle);
-        $response = $safeCurl->execute('http://40.media.tumblr.com/39e917383bf5fe228b82fef850251220/tumblr_nxyw8cjiYx1u7jfjwo1_100.jpg');
-
-        $this->assertEquals('', $response);
-        $this->assertEquals($handle, $safeCurl->getCurlHandle());
-        $this->assertNotContains('HTTP/1.1 302 Found', $response);
     }
 
     /**
-     * @expectedException \fin1te\SafeCurl\Exception
-     * @expectedExceptionMessage SafeCurl expects a valid cURL resource - "NULL" provided.
+     * Verify a valid cURL handle is required to use the class.
+     *
+     * @expectedException \InvalidArgumentException
+     * @expectedExceptionMessage Invalid cURL handle provided.
      */
-    public function testBadCurlHandler()
-    {
+    public function testBadCurlHandler() {
         new SafeCurl(null);
     }
 
-    public function dataForBlockedUrl()
-    {
-        return array(
-            array('http://0.0.0.0:123', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidPortException', 'Provided port "123" doesn\'t match whitelisted values: 80, 443, 8080'),
-            array('http://127.0.0.1/server-status', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidIPException', 'Provided host "127.0.0.1" resolves to "127.0.0.1", which matches a blacklisted value: 127.0.0.0/8'),
-            array('file:///etc/passwd', 'fin1te\SafeCurl\Exception\InvalidURLException', 'Provided URL "file:///etc/passwd" doesn\'t contain a hostname'),
-            array('ssh://localhost', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidSchemeException', 'Provided scheme "ssh" doesn\'t match whitelisted values: http, https'),
-            array('gopher://localhost', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidSchemeException', 'Provided scheme "gopher" doesn\'t match whitelisted values: http, https'),
-            array('telnet://localhost:25', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidSchemeException', 'Provided scheme "telnet" doesn\'t match whitelisted values: http, https'),
-            array('http://169.254.169.254/latest/meta-data/', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidIPException', 'Provided host "169.254.169.254" resolves to "169.254.169.254", which matches a blacklisted value: 169.254.0.0/16'),
-            array('ftp://myhost.com', 'fin1te\SafeCurl\Exception\InvalidURLException\InvalidSchemeException', 'Provided scheme "ftp" doesn\'t match whitelisted values: http, https'),
-            array('http://user:pass@safecurl.fin1te.net?@google.com/', 'fin1te\SafeCurl\Exception\InvalidURLException', 'Credentials passed in but "sendCredentials" is set to false'),
-        );
+    /**
+     * Provide data for testing blocked URLs.
+     *
+     * @return array
+     */
+    public function dataForBlockedUrl(): array {
+        return [
+            [
+                "http://0.0.0.0:123",
+                InvalidURLException::class,
+                "Port is not whitelisted.",
+            ],
+            [
+                "http://127.0.0.1/server-status",
+                InvalidURLException::class,
+                "Host resolves to a blacklisted address.",
+            ],
+            [
+                "file:///etc/passwd",
+                InvalidURLException::class,
+                "No host found in URL.",
+            ],
+            [
+                "ssh://localhost",
+                InvalidURLException::class,
+                "Scheme is not whitelisted.",
+            ],
+            [
+                "gopher://localhost",
+                InvalidURLException::class,
+                "Scheme is not whitelisted.",
+            ],
+            [
+                "telnet://localhost:25",
+                InvalidURLException::class,
+                "Scheme is not whitelisted.",
+            ],
+            [
+                "http://169.254.169.254/latest/meta-data/",
+                InvalidURLException::class,
+                "Host resolves to a blacklisted address.",
+            ],
+            [
+                "ftp://myhost.com",
+                InvalidURLException::class,
+                "Scheme is not whitelisted.",
+            ],
+            [
+                "http://user:pass@www.vanillaforums.com?@www.example.com/",
+                InvalidURLException::class,
+                "Credentials not allowed as part of the URL.",
+            ],
+        ];
     }
 
     /**
+     * Verify the default configuration can block dangerous URLs.
+     *
+     * @param string $url
+     * @param string $exception
+     * @param string $message
      * @dataProvider dataForBlockedUrl
      */
-    public function testBlockedUrl($url, $exception, $message)
-    {
-        $this->setExpectedException($exception, $message);
+    public function testBlockedUrl(string $url, string $exception, string $message) {
+        $this->expectException($exception, $message);
+        $this->expectExceptionMessage($message);
 
         $safeCurl = new SafeCurl(curl_init());
         $safeCurl->execute($url);
     }
 
-    public function dataForBlockedUrlByOptions()
-    {
-        return array(
-            array('http://login:password@google.fr', 'fin1te\SafeCurl\Exception\InvalidURLException', 'Credentials passed in but "sendCredentials" is set to false'),
-            array('http://safecurl.fin1te.net', 'fin1te\SafeCurl\Exception\InvalidURLException', 'Provided host "safecurl.fin1te.net" matches a blacklisted value'),
-        );
+    /**
+     * Provide data for testing custom validation criteria.
+     *
+     * @return array
+     */
+    public function dataForBlockedUrlByOptions(): array {
+        return [
+            ["http://login:password@www.example.com", InvalidURLException::class, "Credentials not allowed as part of the URL."],
+            ["http://www.example.com", InvalidURLException::class, "Host is blacklisted."],
+        ];
     }
 
     /**
+     * Verify validation based on custom criteria.
+     *
+     * @param string $url
+     * @param string $exception
+     * @param string $message
      * @dataProvider dataForBlockedUrlByOptions
      */
-    public function testBlockedUrlByOptions($url, $exception, $message)
-    {
-        $this->setExpectedException($exception, $message);
+    public function testBlockedUrlByOptions(string $url, string $exception, string $message) {
+        $this->expectException($exception);
+        $this->expectExceptionMessage($message);
 
-        $options = new Options();
-        $options->addToList('blacklist', 'domain', '(.*)\.fin1te\.net');
-        $options->addToList('whitelist', 'scheme', 'ftp');
-        $options->disableSendCredentials();
+        $blacklist = new UrlPartsList();
+        $blacklist->addHost("(.*)\.example\.com");
 
-        $safeCurl = new SafeCurl(curl_init(), $options);
+        $urlValidator = new UrlValidator($blacklist);
+        $urlValidator->setCredentialsAllowed(false);
+
+        $safeCurl = new SafeCurl(curl_init(), $urlValidator);
         $safeCurl->execute($url);
     }
 
-    public function testWithPinDnsEnabled()
-    {
-        $options = new Options();
-        $options->enablePinDns();
+    /**
+     * Verify limiting following redirects.
+     *
+     * @expectedException \Garden\SafeCurl\Exception
+     * @expectedExceptionMessage Redirect limit exceeded.
+     */
+    public function testWithFollowLocationLimit() {
+        $safeCurl = new SafeCurl(curl_init());
+        $safeCurl->setFollowLocation(true);
+        $safeCurl->setFollowLocationLimit(1);
+        $safeCurl->execute("https://google.com");
+    }
 
-        $safeCurl = new SafeCurl(curl_init(), $options);
-        $response = $safeCurl->execute('http://google.com');
+    /**
+     * Verify successfully following redirects.
+     */
+    public function testWithFollowLocation() {
+        $safeCurl = new SafeCurl(curl_init());
+        $safeCurl->setFollowLocation(true);
+        $response = $safeCurl->execute("https://google.com");
 
         $this->assertNotEmpty($response);
     }
 
     /**
-     * @expectedException \fin1te\SafeCurl\Exception
-     * @expectedExceptionMessage Redirect limit "1" hit
+     * Verify blocking a URL that redirects to a blacklisted IP address.
+     *
+     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
+     * @expectedExceptionMessage Port is not whitelisted.
      */
-    public function testWithFollowLocationLimit()
-    {
-        $options = new Options();
-        $options->enableFollowLocation();
-        $options->setFollowLocationLimit(1);
-
-        $safeCurl = new SafeCurl(curl_init(), $options);
-        $safeCurl->execute('http://t.co/5AMOLpSq3v');
-    }
-
-    public function testWithFollowLocation()
-    {
-        $options = new Options();
-        $options->enableFollowLocation();
-
-        $safeCurl = new SafeCurl(curl_init(), $options);
-        $response = $safeCurl->execute('http://t.co/5AMOLpSq3v');
-
-        $this->assertNotEmpty($response);
+    public function testWithFollowLocationLeadingToABlockedUrl() {
+        $safeCurl = new SafeCurl(curl_init());
+        $safeCurl->setFollowLocation(true);
+        $safeCurl->execute("http://httpbin.org/redirect-to?url=http://0.0.0.0:123");
     }
 
     /**
-     * @expectedException \fin1te\SafeCurl\Exception\InvalidURLException\InvalidPortException
-     * @expectedExceptionMessage Provided port "123" doesn't match whitelisted values: 80, 443, 8080
+     * Verify cURL timeouts are appropriately reported.
+     *
+     * @expectedException \Garden\SafeCurl\Exception\CurlException
+     * @expectedExceptionMessage Resolving timed out after 1 milliseconds
      */
-    public function testWithFollowLocationLeadingToABlockedUrl()
-    {
-        $options = new Options();
-        $options->enableFollowLocation();
-
-        $safeCurl = new SafeCurl(curl_init(), $options);
-        $safeCurl->execute('http://httpbin.org/redirect-to?url=http://0.0.0.0:123');
-    }
-
-    /**
-     * @expectedException \fin1te\SafeCurl\Exception
-     * @expectedExceptionMessage cURL Error:
-     */
-    public function testWithCurlTimeout()
-    {
+    public function testWithCurlTimeout() {
         $handle = curl_init();
         curl_setopt($handle, CURLOPT_TIMEOUT_MS, 1);
 
         $safeCurl = new SafeCurl($handle);
-        $safeCurl->execute('https://httpstat.us/200?sleep=100');
+        $safeCurl->execute("https://httpstat.us/200?sleep=100");
     }
 }
