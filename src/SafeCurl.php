@@ -46,8 +46,9 @@ class SafeCurl {
      * Exectutes a cURL request, whilst checking that the URL abides by our whitelists/blacklists.
      *
      * @param string $url
+     * @return bool|string
      */
-    public function execute($url): string {
+    public function execute($url) {
         $redirected = false;
         $redirectCount = 0;
         $redirectLimit = $this->getFollowLocationLimit();
