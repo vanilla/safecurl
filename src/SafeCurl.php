@@ -56,6 +56,18 @@ class SafeCurl {
         do {
             $url = $this->urlValidator->validateUrl($url);
 
+            if ($url && isset($url['host']) && isset($url['ips'])) {
+                $resolves = [];
+                foreach ($url['ips'] as $url_ip) {
+                    foreach ([80, 443, 8080] as $url_port) {
+                        $resolves[] = "{$url['host']}:$url_port:$url_ip";
+                    }
+                }
+                curl_setopt($this->curlHandle, CURLOPT_RESOLVE, $resolves);
+            } else {
+                throw new Exception("Cannot resolve host.");
+            }
+
             curl_setopt($this->curlHandle, CURLOPT_URL, $url["url"]);
 
             $response = curl_exec($this->curlHandle);
