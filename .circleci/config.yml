@@ -4,7 +4,7 @@ aliases:
     run:
       name: PHPUnit
       command: |
-        cd ~/workspace/repo
+        cd ~/project
         ./vendor/bin/phpunit -c phpunit.xml
   - &composerInstall
     run:
