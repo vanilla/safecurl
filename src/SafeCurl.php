@@ -7,6 +7,7 @@
 namespace Garden\SafeCurl;
 
 use Garden\SafeCurl\Exception\CurlException;
+use InvalidArgumentException;
 
 /**
  * A wrapper to curl_exec for safely executing requests.
@@ -15,7 +16,7 @@ class SafeCurl {
 
     private const CURL_RESOURCE_TYPE = "curl";
 
-    /** @var resource */
+    /** @var CurlHandler */
     private $curlHandle;
 
     /** @var boolean */
@@ -33,7 +34,7 @@ class SafeCurl {
     /**
      * Setup the instance.
      *
-     * @param resource $curlHandle
+     * @param resource|CurlHandler $curlHandle
      * @param UrlValidator $urlValidator
      */
     public function __construct($curlHandle, ?UrlValidator $urlValidator = null) {
@@ -63,23 +64,23 @@ class SafeCurl {
                         $resolves[] = "{$url['host']}:$url_port:$url_ip";
                     }
                 }
-                curl_setopt($this->curlHandle, CURLOPT_RESOLVE, $resolves);
+                $this->curlHandle->setOption(CURLOPT_RESOLVE, $resolves);
             } else {
                 throw new Exception("Cannot resolve host.");
             }
 
-            curl_setopt($this->curlHandle, CURLOPT_URL, $url["url"]);
+            $this->curlHandle->setOption(CURLOPT_URL, $url["url"]);
 
-            $response = curl_exec($this->curlHandle);
+            $response = $this->curlHandle->execute();
 
-            if (curl_errno($this->curlHandle)) {
-                $error = curl_error($this->curlHandle);
+            if ($this->curlHandle->getErrorNumber()) {
+                $error = $this->curlHandle->getError();
                 throw new CurlException($error);
             }
 
             //Check for an HTTP redirect.
             if ($this->shouldFollowLocation()) {
-                $statusCode = curl_getinfo($this->curlHandle, CURLINFO_HTTP_CODE);
+                $statusCode = $this->curlHandle->getInfo(CURLINFO_HTTP_CODE);
                 switch ($statusCode) {
                     case 301:
                     case 302:
@@ -88,7 +89,7 @@ class SafeCurl {
                     case 308:
                         //Redirect received, so rinse and repeat.
                         if (0 === $redirectLimit || ++$redirectCount < $redirectLimit) {
-                            $url = curl_getinfo($this->curlHandle, CURLINFO_REDIRECT_URL);
+                            $url = $this->curlHandle->getInfo(CURLINFO_REDIRECT_URL);
                             $redirected = true;
                         } else {
                             throw new Exception("Redirect limit exceeded.");
@@ -126,14 +127,14 @@ class SafeCurl {
      */
     protected function init(): void {
         //To start with, disable FOLLOWLOCATION since we'll handle it.
-        curl_setopt($this->curlHandle, CURLOPT_FOLLOWLOCATION, false);
+        $this->curlHandle->setOption(CURLOPT_FOLLOWLOCATION, false);
 
-        curl_setopt($this->curlHandle, CURLOPT_RETURNTRANSFER, true);
+        $this->curlHandle->setOption(CURLOPT_RETURNTRANSFER, true);
 
         //Force IPv4, since this class isn't yet comptible with IPv6.
-        $curlVersion = curl_version();
+        $curlVersion = $this->curlHandle->getVersion();
         if ($curlVersion["features"] & CURLOPT_IPRESOLVE) {
-            curl_setopt($this->curlHandle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            $this->curlHandle->setOption(CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         }
     }
 
@@ -141,7 +142,7 @@ class SafeCurl {
      * Remove headers from an output string, based
      *
      * @param string $output
-     * @param resource $curlHandle
+     * @param int $headersLength
      * @return string
      */
     private function removeHeadersFromOutput(string $output, int $headersLength): string {
@@ -158,11 +159,17 @@ class SafeCurl {
     /**
      * Sets cURL handle.
      *
-     * @param resource $curlHandle
+     * @param resource|CurlHandler $curlHandle
      */
     public function setCurlHandle($curlHandle): void {
-        $this->validateCurlHandle($curlHandle);
-        $this->curlHandle = $curlHandle;
+        if (is_resource($curlHandle)){
+            $this->validateCurlHandle($curlHandle);
+            $this->curlHandle = new CurlHandler($curlHandle);
+        } elseif ($curlHandle instanceof CurlHandler) {
+            $this->curlHandle = $curlHandle;
+        } else {
+            throw new InvalidArgumentException('curlHandle must be a resource or instance of Garden\SafeCurl\CurlHandler');
+        }
     }
 
     /**

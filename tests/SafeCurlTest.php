@@ -10,6 +10,7 @@ use Garden\SafeCurl\SafeCurl;
 use Garden\SafeCurl\Exception\InvalidURLException;
 use Garden\SafeCurl\UrlPartsList;
 use Garden\SafeCurl\UrlValidator;
+use InvalidArgumentException;
 
 /**
  * Verify functionality of the SafeCurl class.
@@ -31,10 +32,10 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
     /**
      * Verify a valid cURL handle is required to use the class.
      *
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Invalid cURL handle provided.
      */
     public function testBadCurlHandler() {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('curlHandle must be a resource or instance of Garden\SafeCurl\CurlHandler');
         new SafeCurl(null);
     }
 
@@ -170,8 +171,8 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
     /**
      * Verify blocking a URL that redirects to a blacklisted IP address.
      *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Port is not whitelisted.
+     * expectedException \Garden\SafeCurl\Exception\InvalidURLException
+     * expectedExceptionMessage Port is not whitelisted.
      */
     public function testWithFollowLocationLeadingToABlockedUrl() {
         $safeCurl = new SafeCurl(curl_init());
