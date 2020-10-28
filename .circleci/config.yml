@@ -10,7 +10,7 @@ aliases:
     run:
       name: Composer Install
       command: |
-        cd ~/workspace/repo
+        cd ~/project
         composer install --optimize-autoloader
   - &testSteps
     - checkout
