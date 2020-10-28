@@ -58,13 +58,7 @@ class SafeCurl {
             $url = $this->urlValidator->validateUrl($url);
 
             if ($url && isset($url['host']) && isset($url['ips'])) {
-                $resolves = [];
-                foreach ($url['ips'] as $url_ip) {
-                    foreach ([80, 443, 8080] as $url_port) {
-                        $resolves[] = "{$url['host']}:$url_port:$url_ip";
-                    }
-                }
-                $this->curlHandle->setOption(CURLOPT_RESOLVE, $resolves);
+                $this->setHostIPs($url);
             } else {
                 throw new Exception("Cannot resolve host.");
             }
@@ -188,6 +182,33 @@ class SafeCurl {
      */
     public function setFollowLocationLimit(int $limit): void {
         $this->followLocationLimit = $limit;
+    }
+
+    /**
+     * After a host's IPs have been resolved, we set them as a cURL option.
+     * This prevents the use of DNS rebinding as an SSRF attack
+     *
+     * @param array $url
+     */
+    public function setHostIPs(array $url): void {
+        $port = parse_url($url['url'], PHP_URL_PORT);
+        if (is_null($port) ){
+            $scheme = parse_url($url['url'], PHP_URL_SCHEME);
+            switch($scheme){
+                case 'http':
+                    $port = 80;
+                case 'https':
+                    $port = 443;
+                default:
+                    $port = 80;
+            };
+        }
+
+        $resolves = [];
+        foreach ($url['ips'] as $url_ip) {
+            $resolves[] = "{$url['host']}:$port:$url_ip";
+        }
+        $this->curlHandle->setOption(CURLOPT_RESOLVE, $resolves);
     }
 
     /**
