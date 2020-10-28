@@ -9,11 +9,12 @@ namespace Garden\SafeCurl\Tests;
 use Garden\SafeCurl\Exception\InvalidURLException;
 use Garden\SafeCurl\UrlPartsList;
 use Garden\SafeCurl\UrlValidator;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Verify functionality in the URL validator class.
  */
-class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
+class UrlValidatorTest extends TestCase {
 
     /**
      * Data for testing basic URL validation.
@@ -78,11 +79,11 @@ class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify scheme blacklisting.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Scheme is blacklisted.
      */
     public function testValidateScheme() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Scheme is blacklisted.");
+
         $blacklist = new UrlPartsList();
         $blacklist->addScheme("http");
         $urlValidator = new UrlValidator($blacklist);
@@ -92,11 +93,11 @@ class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify port blacklisting.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Port is blacklisted.
      */
     public function testValidatePort() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Port is blacklisted.");
+
         $blacklist = new UrlPartsList();
         $blacklist->addPort(8080);
         $urlValidator = new UrlValidator($blacklist);
@@ -106,11 +107,11 @@ class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify host blacklisting using regex pattern matching.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Host is blacklisted.
      */
     public function testValidateHostBlacklist() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Host is blacklisted.");
+
         $blacklist = new UrlPartsList();
         $blacklist->addHost("(.*)\.example\.com");
         $urlValidator = new UrlValidator($blacklist);
@@ -120,11 +121,11 @@ class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify host whitelisting using regex pattern matching.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Host is not whitelisted.
      */
     public function testValidateHostWhitelist() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Host is not whitelisted.");
+
         $whitelist = new UrlPartsList();
         $whitelist->addHost("(.*)\.vanillaforums\.com");
         $urlValidator = new UrlValidator(null, $whitelist);
@@ -134,22 +135,22 @@ class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify inability to resolve a hostname generates an error.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Unable to resolve host.
      */
     public function testValidateHostWithnoip() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Unable to resolve host.");
+
         $urlValidator = new UrlValidator();
         $urlValidator->validateUrl("http://www.example.invalid");
     }
 
     /**
      * Verify IP address blocking using whitelisting.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Host does not resolve to a whitelisted address.
      */
     public function testValidateHostWithWhitelistIp() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Host does not resolve to a whitelisted address.");
+
         $whitelist = new UrlPartsList();
         $whitelist->addIP("1.1.1.1");
         $urlValidator = new UrlValidator(null, $whitelist);
@@ -176,11 +177,11 @@ class UrlValidatorTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify IP address blocking using blacklisting.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Host resolves to a blacklisted address.
      */
     public function testValidateHostWithBlacklistIp() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Host resolves to a blacklisted address.");
+
         $blacklist = new UrlPartsList();
         $blacklist->addIP("1.1.1.1");
         $urlValidator = new UrlValidator($blacklist);
