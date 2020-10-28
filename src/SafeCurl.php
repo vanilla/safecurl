@@ -7,6 +7,7 @@
 namespace Garden\SafeCurl;
 
 use Garden\SafeCurl\Exception\CurlException;
+use Garden\SafeCurl\Exception\InvalidURLException;
 use InvalidArgumentException;
 
 /**
@@ -60,7 +61,7 @@ class SafeCurl {
             if ($url && isset($url['host']) && isset($url['ips'])) {
                 $this->setHostIPs($url);
             } else {
-                throw new Exception("Cannot resolve host.");
+                throw new InvalidURLException("Unable to resolve host.");
             }
 
             $this->curlHandle->setOption(CURLOPT_URL, $url["url"]);
