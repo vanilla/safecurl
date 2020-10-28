@@ -6,15 +6,19 @@
 
 namespace Garden\SafeCurl\Tests;
 
+use Garden\SafeCurl\Exception;
+use Garden\SafeCurl\Exception\CurlException;
 use Garden\SafeCurl\SafeCurl;
 use Garden\SafeCurl\Exception\InvalidURLException;
 use Garden\SafeCurl\UrlPartsList;
 use Garden\SafeCurl\UrlValidator;
+use InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Verify functionality of the SafeCurl class.
  */
-class SafeCurlTest extends \PHPUnit\Framework\TestCase {
+class SafeCurlTest extends TestCase {
 
     /**
      * Verify the ability to retrieve a normal URL using the default configuration.
@@ -30,11 +34,10 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify a valid cURL handle is required to use the class.
-     *
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Invalid cURL handle provided.
      */
     public function testBadCurlHandler() {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Invalid cURL handle provided.");
         new SafeCurl(null);
     }
 
@@ -102,7 +105,7 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
      * @dataProvider dataForBlockedUrl
      */
     public function testBlockedUrl(string $url, string $exception, string $message) {
-        $this->expectException($exception, $message);
+        $this->expectException($exception);
         $this->expectExceptionMessage($message);
 
         $safeCurl = new SafeCurl(curl_init());
@@ -145,11 +148,11 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify limiting following redirects.
-     *
-     * @expectedException \Garden\SafeCurl\Exception
-     * @expectedExceptionMessage Redirect limit exceeded.
      */
     public function testWithFollowLocationLimit() {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Redirect limit exceeded.");
+
         $safeCurl = new SafeCurl(curl_init());
         $safeCurl->setFollowLocation(true);
         $safeCurl->setFollowLocationLimit(1);
@@ -169,11 +172,11 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify blocking a URL that redirects to a blacklisted IP address.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\InvalidURLException
-     * @expectedExceptionMessage Port is not whitelisted.
      */
     public function testWithFollowLocationLeadingToABlockedUrl() {
+        $this->expectException(InvalidURLException::class);
+        $this->expectExceptionMessage("Port is not whitelisted.");
+
         $safeCurl = new SafeCurl(curl_init());
         $safeCurl->setFollowLocation(true);
         $safeCurl->execute("http://httpbin.org/redirect-to?url=http://0.0.0.0:123");
@@ -181,11 +184,11 @@ class SafeCurlTest extends \PHPUnit\Framework\TestCase {
 
     /**
      * Verify cURL timeouts are appropriately reported.
-     *
-     * @expectedException \Garden\SafeCurl\Exception\CurlException
-     * @expectedExceptionMessage Resolving timed out after 1 milliseconds
      */
     public function testWithCurlTimeout() {
+        $this->expectException(CurlException::class);
+        $this->expectExceptionMessage("timed out");
+
         $handle = curl_init();
         curl_setopt($handle, CURLOPT_TIMEOUT_MS, 1);
 
