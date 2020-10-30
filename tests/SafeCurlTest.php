@@ -6,6 +6,7 @@
 
 namespace Garden\SafeCurl\Tests;
 
+use Garden\SafeCurl\CurlHandler;
 use Garden\SafeCurl\Exception;
 use Garden\SafeCurl\Exception\CurlException;
 use Garden\SafeCurl\SafeCurl;
@@ -19,6 +20,35 @@ use PHPUnit\Framework\TestCase;
  * Verify functionality of the SafeCurl class.
  */
 class SafeCurlTest extends TestCase {
+
+    private $curlHandler;
+
+    /**
+     * Invoke an other protected method on an object
+     *
+     * @param $object
+     * @param $methodName
+     * @param array $parameters
+     * @return mixed
+     * @throws \ReflectionException
+     */
+    public function invokeMethod(&$object, $methodName, array $parameters = array())
+    {
+        $reflection = new \ReflectionClass(get_class($object));
+        $method = $reflection->getMethod($methodName);
+        $method->setAccessible(true);
+
+        return $method->invokeArgs($object, $parameters);
+    }
+
+    protected function setUp(): void {
+        parent::setUp();
+        $this->curlHandler = $this->createStub(CurlHandler::class);
+        $this->curlHandler
+            ->expects($this->any())
+            ->method('getVersion')
+            ->willReturn(curl_version());
+    }
 
     /**
      * Verify the ability to retrieve a normal URL using the default configuration.
@@ -34,10 +64,11 @@ class SafeCurlTest extends TestCase {
 
     /**
      * Verify a valid cURL handle is required to use the class.
+     *
      */
     public function testBadCurlHandler() {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("Invalid cURL handle provided.");
+        $this->expectExceptionMessage('curlHandle must be a resource or instance of Garden\SafeCurl\CurlHandler');
         new SafeCurl(null);
     }
 
@@ -170,6 +201,39 @@ class SafeCurlTest extends TestCase {
         $this->assertNotEmpty($response);
     }
 
+    public function testSettingHostIPs() {
+        $url = [
+            'url' => 'http://example.com',
+            'host' => 'example.com',
+            'ips' => [
+                '1.2.3.4'
+            ]
+        ];
+
+        $option = CURLOPT_RESOLVE;
+        $value = [
+            'example.com:80:1.2.3.4'
+        ];
+
+
+        $setOptionValue = null;
+        $this->curlHandler
+            ->expects($this->any())
+            ->method('setOption')
+            ->will(
+                $this->returnCallback(function($op, $val) use($option, &$setOptionValue){
+                    if($op === $option){
+                        $setOptionValue = $val;
+                    }
+                })
+            )
+        ;
+
+        $safeCurl = new SafeCurl($this->curlHandler);
+        $this->invokeMethod($safeCurl, 'setHostIPs', [$url]);
+        $this->assertSame($value, $setOptionValue);
+    }
+
     /**
      * Verify blocking a URL that redirects to a blacklisted IP address.
      */
@@ -177,9 +241,27 @@ class SafeCurlTest extends TestCase {
         $this->expectException(InvalidURLException::class);
         $this->expectExceptionMessage("Port is not whitelisted.");
 
-        $safeCurl = new SafeCurl(curl_init());
+        $httpCode = 301;
+        $redirectUrl = 'http://0.0.0.0:123';
+
+        $this->curlHandler
+            ->expects($this->any())
+            ->method('getInfo')
+            ->will(
+                $this->returnCallback(function($option) use($httpCode, $redirectUrl) {
+                    if (CURLINFO_HTTP_CODE === $option) {
+                        return $httpCode;
+                    }
+                    if (CURLINFO_REDIRECT_URL === $option) {
+                        return $redirectUrl;
+                    }
+                })
+            )
+        ;
+
+        $safeCurl = new SafeCurl($this->curlHandler);
         $safeCurl->setFollowLocation(true);
-        $safeCurl->execute("http://httpbin.org/redirect-to?url=http://0.0.0.0:123");
+        $safeCurl->execute("http://httpbin.org/redirect-to?url=$redirectUrl");
     }
 
     /**
