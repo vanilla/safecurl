@@ -58,12 +58,6 @@ class SafeCurl {
         do {
             $url = $this->urlValidator->validateUrl($url);
 
-            if ($url && isset($url['host']) && isset($url['ips'])) {
-                $this->setHostIPs($url);
-            } else {
-                throw new InvalidURLException("Unable to resolve host.");
-            }
-
             $this->curlHandle->setOption(CURLOPT_URL, $url["url"]);
 
             $response = $this->curlHandle->execute();
@@ -191,17 +185,18 @@ class SafeCurl {
      *
      * @param array $url
      */
-    public function setHostIPs(array $url): void {
+    private function setHostIPs(array $url): void {
         $port = parse_url($url['url'], PHP_URL_PORT);
         if (is_null($port) ){
             $scheme = parse_url($url['url'], PHP_URL_SCHEME);
             switch($scheme){
-                case 'http':
-                    $port = 80;
                 case 'https':
                     $port = 443;
+                    break;
+                case 'http':
                 default:
                     $port = 80;
+                    break;
             };
         }
 

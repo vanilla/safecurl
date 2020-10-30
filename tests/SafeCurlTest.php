@@ -23,6 +23,24 @@ class SafeCurlTest extends TestCase {
 
     private $curlHandler;
 
+    /**
+     * Invoke an other protected method on an object
+     *
+     * @param $object
+     * @param $methodName
+     * @param array $parameters
+     * @return mixed
+     * @throws \ReflectionException
+     */
+    public function invokeMethod(&$object, $methodName, array $parameters = array())
+    {
+        $reflection = new \ReflectionClass(get_class($object));
+        $method = $reflection->getMethod($methodName);
+        $method->setAccessible(true);
+
+        return $method->invokeArgs($object, $parameters);
+    }
+
     protected function setUp(): void {
         parent::setUp();
         $this->curlHandler = $this->createStub(CurlHandler::class);
@@ -212,7 +230,7 @@ class SafeCurlTest extends TestCase {
         ;
 
         $safeCurl = new SafeCurl($this->curlHandler);
-        $safeCurl->setHostIPs($url);
+        $this->invokeMethod($safeCurl, 'setHostIPs', [$url]);
         $this->assertSame($value, $setOptionValue);
     }
 
